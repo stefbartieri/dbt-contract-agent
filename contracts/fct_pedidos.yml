@@ -1,0 +1,129 @@
+# Data contract — fct_pedidos
+#
+# Este arquivo é escrito por gente. Testes dbt, schema.yml e documentação são
+# derivados dele (Princípio I). Para mudar uma garantia, mude aqui — nunca no
+# YAML gerado.
+
+dataset: fct_pedidos
+owner: analytics-engineering
+grain: [pedido_id]
+description: >
+  Um pedido por linha, já consolidado. É a base de todas as métricas de venda.
+  Inclui pedidos cancelados, identificados pelo status — quem quiser só venda
+  efetiva precisa filtrar.
+
+columns:
+  - name: pedido_id
+    type: integer
+    description: Identificador único do pedido no sistema de origem.
+
+  - name: cliente_id
+    type: integer
+    description: Cliente que fez o pedido. Referencia dim_clientes.
+
+  - name: data_pedido
+    type: date
+    description: Data em que o pedido foi criado, no fuso de São Paulo.
+
+  - name: canal
+    type: varchar
+    description: Canal de origem da venda.
+
+  - name: status
+    type: varchar
+    description: Situação atual do pedido no ciclo de vida.
+
+  - name: valor_bruto
+    type: decimal
+    description: Soma dos itens antes de qualquer desconto, sem frete.
+
+  - name: valor_desconto
+    type: decimal
+    description: Total de descontos aplicados ao pedido.
+
+  - name: valor_liquido
+    type: decimal
+    description: Valor bruto menos descontos. É o que entra em receita.
+
+  - name: itens
+    type: integer
+    description: Quantidade de itens distintos no pedido.
+
+invariants:
+  - type: unique
+    column: pedido_id
+    business_rule: >
+      Cada pedido aparece uma única vez. Se aparecer duas, alguma ingestão
+      reprocessou o lote e toda métrica de volume está inflada.
+
+  - type: not_null
+    column: valor_liquido
+    business_rule: >
+      Todo pedido tem valor líquido, mesmo que zero. Nulo aqui significa que o
+      cálculo falhou, e a soma de receita fica silenciosamente menor.
+
+  - type: not_null
+    column: cliente_id
+    business_rule: >
+      Todo pedido pertence a um cliente. Nulo impede qualquer recorte por
+      segmento ou região.
+
+  - type: accepted_values
+    column: status
+    values: [aprovado, pendente, cancelado, devolvido]
+    business_rule: >
+      Status fora desta lista significa que o sistema de origem criou um estado
+      novo sem avisar. Métricas que filtram por status passam a ignorar esses
+      pedidos em silêncio.
+
+  - type: accepted_values
+    column: canal
+    values: [app, site, marketplace, loja]
+    business_rule: >
+      Canal novo sem mapeamento some dos relatórios por canal, e o total deixa
+      de bater com o total geral.
+
+  - type: range
+    column: valor_liquido
+    min: 0
+    business_rule: >
+      Receita negativa não existe neste dataset. Devolução é registrada como
+      status, não como valor negativo — se aparecer negativo, alguém mudou essa
+      convenção sem atualizar as métricas.
+
+  - type: range
+    column: itens
+    min: 1
+    max: 200
+    business_rule: >
+      Todo pedido tem ao menos um item. Acima de 200 é praticamente certo que
+      houve fan-out de join na origem, não um pedido real.
+
+  - type: relationship
+    column: cliente_id
+    references: dim_clientes
+    references_column: cliente_id
+    business_rule: >
+      Todo cliente_id existe na dimensão. Quebra aqui faz o inner join descartar
+      pedidos silenciosamente, e a receita some sem erro nenhum.
+
+  - type: expression
+    name: liquido_nao_excede_bruto
+    expression: "valor_liquido <= valor_bruto"
+    business_rule: >
+      O valor líquido nunca supera o bruto, porque desconto só subtrai. Violação
+      indica sinal trocado no cálculo de desconto.
+
+  - type: expression
+    name: liquido_igual_bruto_menos_desconto
+    expression: "abs(valor_liquido - (valor_bruto - valor_desconto)) < 0.01"
+    business_rule: >
+      A aritmética do pedido fecha. Esta é a invariante que pega erro de
+      arredondamento acumulado e desconto aplicado duas vezes.
+
+  - type: row_count
+    min: 8000
+    max: 20000
+    business_rule: >
+      O volume diário histórico fica nesta faixa. Fora dela, ou a carga veio
+      incompleta ou duplicou — em ambos os casos, não publique.

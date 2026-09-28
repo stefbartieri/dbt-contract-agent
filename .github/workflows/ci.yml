@@ -1,0 +1,47 @@
+name: CI
+
+on:
+  push: {branches: [main]}
+  pull_request:
+
+jobs:
+  verificar:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: {python-version: "3.12"}
+
+      - run: pip install -r requirements.txt
+
+      - name: Lint
+        run: python -m ruff check src tests evals data
+
+      - name: Determinismo do dataset
+        run: |
+          python data/generate.py
+          A=$(python -c "import sys;sys.path.insert(0,'data');import generate;print(generate.fingerprint())")
+          python data/generate.py
+          B=$(python -c "import sys;sys.path.insert(0,'data');import generate;print(generate.fingerprint())")
+          test "$A" = "$B" || { echo "dataset nao e deterministico"; exit 1; }
+
+      - name: Regenerar nao pode produzir diff (CA5 / Principio IV)
+        env: {PYTHONPATH: src}
+        run: |
+          python -m contract_agent.cli
+          git diff --exit-code -- dbt/models/marts/schema.yml dbt/tests docs \
+            || { echo "artefato gerado esta fora de sincronia ou foi editado a mao"; exit 1; }
+
+      - name: Testes
+        env: {PYTHONPATH: src}
+        run: python -m pytest tests -q --cov=contract_agent --cov-report=term-missing
+
+      - name: dbt build (CA4 - verde no integro)
+        working-directory: dbt
+        run: |
+          DBT_PROFILES_DIR=. python -m dbt.cli.main deps --project-dir .
+          DBT_PROFILES_DIR=. python -m dbt.cli.main build --project-dir .
+
+      - name: Avaliacao por mutacao
+        env: {PYTHONPATH: src}
+        run: python evals/runner.py

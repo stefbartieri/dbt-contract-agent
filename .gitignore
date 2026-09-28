@@ -1,0 +1,13 @@
+__pycache__/
+*.py[cod]
+.venv/
+.pytest_cache/
+.coverage
+htmlcov/
+.ruff_cache/
+data/raw/
+warehouse.duckdb
+dbt/target/
+dbt/logs/
+dbt/dbt_packages/
+logs/

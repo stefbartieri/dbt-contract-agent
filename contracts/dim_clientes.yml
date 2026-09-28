@@ -1,0 +1,48 @@
+# Data contract — dim_clientes
+#
+# Escrito por gente. Testes e documentação são derivados (Princípio I).
+
+dataset: dim_clientes
+owner: analytics-engineering
+grain: [cliente_id]
+description: >
+  Um cliente por linha. É a dimensão conformada de cliente, alvo do
+  relacionamento declarado em fct_pedidos.
+
+columns:
+  - name: cliente_id
+    type: integer
+    description: Identificador único do cliente no sistema de origem.
+
+  - name: regiao
+    type: varchar
+    description: Macrorregião do endereço principal do cliente.
+
+  - name: segmento
+    type: varchar
+    description: Classificação comercial do cliente por recorrência de compra.
+
+invariants:
+  - type: unique
+    column: cliente_id
+    business_rule: >
+      Cada cliente aparece uma única vez. Duplicata aqui causa fan-out em todo
+      join com a dimensão, inflando receita sem erro aparente.
+
+  - type: not_null
+    column: cliente_id
+    business_rule: >
+      A chave da dimensão nunca é nula. Nulo quebra o join e descarta pedidos.
+
+  - type: accepted_values
+    column: regiao
+    values: [norte, nordeste, centro-oeste, sudeste, sul]
+    business_rule: >
+      Região fora desta lista some dos relatórios geográficos, e a soma das
+      regiões deixa de bater com o total.
+
+  - type: accepted_values
+    column: segmento
+    values: [novo, recorrente, vip]
+    business_rule: >
+      Segmento novo sem mapeamento quebra toda análise de coorte.

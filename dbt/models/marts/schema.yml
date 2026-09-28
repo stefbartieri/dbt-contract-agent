@@ -1,0 +1,80 @@
+# ATENÇÃO: arquivo gerado por contract-agent. NÃO EDITE À MÃO.
+# Ele é reescrito por completo a cada `make build`, e o CI falha se houver
+# edição manual. Para mudar uma garantia, edite o data contract em
+# contracts/dim_clientes.yml, fct_pedidos.yml e regenere.
+
+version: 2
+
+models:
+  - name: dim_clientes
+    description: >
+      Um cliente por linha. É a dimensão conformada de cliente, alvo do
+      relacionamento declarado em fct_pedidos.
+    columns:
+      - name: cliente_id
+        description: >
+          Identificador único do cliente no sistema de origem.
+        tests:
+          - not_null
+          - unique
+      - name: regiao
+        description: >
+          Macrorregião do endereço principal do cliente.
+        tests:
+          - accepted_values:
+              values: ['norte', 'nordeste', 'centro-oeste', 'sudeste', 'sul']
+      - name: segmento
+        description: >
+          Classificação comercial do cliente por recorrência de compra.
+        tests:
+          - accepted_values:
+              values: ['novo', 'recorrente', 'vip']
+
+  - name: fct_pedidos
+    description: >
+      Um pedido por linha, já consolidado. É a base de todas as métricas
+      de venda. Inclui pedidos cancelados, identificados pelo status —
+      quem quiser só venda efetiva precisa filtrar.
+    columns:
+      - name: pedido_id
+        description: >
+          Identificador único do pedido no sistema de origem.
+        tests:
+          - unique
+      - name: cliente_id
+        description: >
+          Cliente que fez o pedido. Referencia dim_clientes.
+        tests:
+          - not_null
+          - relationships:
+              to: ref('dim_clientes')
+              field: cliente_id
+      - name: data_pedido
+        description: >
+          Data em que o pedido foi criado, no fuso de São Paulo.
+      - name: canal
+        description: >
+          Canal de origem da venda.
+        tests:
+          - accepted_values:
+              values: ['app', 'site', 'marketplace', 'loja']
+      - name: status
+        description: >
+          Situação atual do pedido no ciclo de vida.
+        tests:
+          - accepted_values:
+              values: ['aprovado', 'pendente', 'cancelado', 'devolvido']
+      - name: valor_bruto
+        description: >
+          Soma dos itens antes de qualquer desconto, sem frete.
+      - name: valor_desconto
+        description: >
+          Total de descontos aplicados ao pedido.
+      - name: valor_liquido
+        description: >
+          Valor bruto menos descontos. É o que entra em receita.
+        tests:
+          - not_null
+      - name: itens
+        description: >
+          Quantidade de itens distintos no pedido.

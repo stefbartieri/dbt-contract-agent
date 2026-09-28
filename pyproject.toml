@@ -1,0 +1,39 @@
+[project]
+name = "dbt-contract-agent"
+version = "1.0.0"
+description = "Data contracts como fonte única de testes e documentação dbt, com avaliação por mutação"
+readme = "README.md"
+requires-python = ">=3.11"
+license = {text = "MIT"}
+authors = [{name = "Stefania Gualtieri Bartoli"}]
+keywords = ["dbt", "data-contracts", "data-quality", "mutation-testing", "analytics-engineering", "duckdb"]
+
+dependencies = ["pyyaml>=6.0", "duckdb>=1.0"]
+
+[project.optional-dependencies]
+llm = ["anthropic>=0.40"]
+dev = ["pytest>=8.0", "pytest-cov>=5.0", "ruff>=0.6", "dbt-duckdb>=1.8"]
+
+[project.scripts]
+contract-agent = "contract_agent.cli:main"
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]
+
+[tool.coverage.report]
+exclude_lines = ["pragma: no cover", "if __name__"]

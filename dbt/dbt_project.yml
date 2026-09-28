@@ -1,0 +1,16 @@
+name: contract_agent
+version: "1.0.0"
+config-version: 2
+profile: contract_agent
+
+model-paths: ["models"]
+test-paths: ["tests"]
+target-path: "target"
+clean-targets: ["target", "dbt_packages"]
+
+models:
+  contract_agent:
+    staging:
+      +materialized: view
+    marts:
+      +materialized: table

@@ -1,0 +1,9 @@
+version: 2
+
+sources:
+  - name: raw
+    meta:
+      external_location: "read_csv_auto('../data/raw/{name}.csv', header=true)"
+    tables:
+      - name: pedidos
+      - name: clientes
